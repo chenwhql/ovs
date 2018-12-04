@@ -91,6 +91,7 @@ struct datapath {
 	possible_net_t net;
 
 	u32 user_features;
+    struct sk_buff** tt_buffer; //[TT_BUFFER_SIZE];
 };
 
 /**

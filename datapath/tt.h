@@ -10,6 +10,16 @@
 
 #define TT_HLEN 4   /* tt header length */
 #define TT_TABLE_SIZE_MIN 16    /* minimum size of tt_table */
+#define TT_BUFFER_SIZE 4096 /* one flow one buffer */
+#define MAX_JITTER 100000
+#define NSEC_PER_SECOND 1000000000
+#define NSEC_PER_MSECOND 1000000
+#define NSEC_PER_USECOND 1000
+
+#define TIMESPEC_TO_NSEC(time_spec) \
+    (time_spec.tv_sec * (__u64)NSEC_PER_SECOND + time_spec.tv_nsec)
+
+#define SWAP(x, y) x = x^y; y = x^y; x = x^y;
 
 // TT报文头
 /**
@@ -46,10 +56,21 @@ struct tt_table_item {
 
 struct tt_table {
 	struct rcu_head rcu;
-	int count, max;
+	__u32 count, max;
 	struct tt_table_item* __rcu tt_items[];
 };
 
+struct tt_send_cache {
+    __u64 *send_times;
+    __u16 *flow_ids;
+    __u16 size;
+};
+
+struct tt_send_info {
+    __u64 macro_period;
+    __u32 advance_time;
+    struct tt_send_cache send_cache; 
+};
 
 /* tt operation */
 bool udp_port_is_tt(__be16 port);
@@ -60,7 +81,6 @@ bool is_tt_packet(struct sk_buff *skb);
 int trdp_to_tt(struct sk_buff *skb);
 int tt_to_trdp(struct sk_buff *skb);
 
-
 /* tt_table operation */
 struct tt_table_item *tt_table_item_alloc(void);
 void rcu_free_tt_table(struct rcu_head *rcu);
@@ -70,4 +90,8 @@ int tt_table_num_items(const struct tt_table* cur_tt_table);
 struct tt_table* tt_table_delete_item(struct tt_table* cur_tt_table, __be16 flow_id);
 struct tt_table* tt_table_item_insert(struct tt_table *cur_tt_table, const struct tt_table_item *new);
 
+/* tt send info */
+__u64 global_time_read(void);
+int dispatch(struct vport* vport);
+void get_next_time(struct vport *vport, __u64 cur_time, __u64 *wait_time, __u16 *flow_id, __u64 *send_time);
 #endif

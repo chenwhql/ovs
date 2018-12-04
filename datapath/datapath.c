@@ -263,14 +263,17 @@ void ovs_dp_detach_port(struct vport *p)
 static void ovs_dp_process_tt_packet(struct sk_buff *skb) {
     struct vport *p = OVS_CB(skb)->input_vport;
     struct datapath *dp = p->dp;
-    struct timeval arrive_stamp;
+    struct timespec arrive_stamp;
     struct tt_table* arrive_tt_table;
     struct tt_header* tthdr;
     struct tt_table_item* tt_item;
-    struct tt_table* send_tt_table;
+    //struct tt_table* send_tt_table;
+    struct timespec current_time;
     int err;
-
-    printk(KERN_ALERT "DEBUG: ovs_dp_process_tt_packet  %s %d \n", __FUNCTION__, __LINE__);
+    __u64 global_time;
+    __u64 arrive_global_time;
+    __u64 offset_time;
+    __u16 flow_id;
 
     if (!(skb)->tstamp.tv64)
         printk(KERN_ALERT "DEBUG: get tstamp error %s %d \n", __FUNCTION__, __LINE__);
@@ -278,14 +281,17 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb) {
     //do_gettimeofday(&arrive_stamp);
     //printk(KERN_ALERT "DEBUG: arrive_stamp: %lld : %lld %s %d \n", arrive_stamp.tv_sec, arrive_stamp.tv_usec, __FUNCTION__, __LINE__);
     //1. 取出skb的时间戳和flow_id
-    skb_get_timestamp(skb, &arrive_stamp);
-    printk(KERN_ALERT "DEBUG: arrive_stamp: %lld : %lld %s %d \n", arrive_stamp.tv_sec, arrive_stamp.tv_usec, __FUNCTION__, __LINE__);
+    skb_get_timestampns(skb, &arrive_stamp);
+    printk(KERN_ALERT "DEBUG: dp features %u arrive_stamp=>%ld: %ld %s %d \n", 
+            dp->user_features, arrive_stamp.tv_sec, arrive_stamp.tv_nsec, __FUNCTION__, __LINE__);
     
     tthdr = (struct tt_header*)skb_tt_header(skb);
     if (!tthdr) {
         printk(KERN_ALERT "DEBUG: get tt header error %s %d \n", __FUNCTION__, __LINE__);
         return;
     }
+    flow_id = tthdr->flow_id;
+    printk(KERN_ALERT "DEBUG: vport=> %d arrive flow id => %d %s %d \n", p->port_no, flow_id, __FUNCTION__, __LINE__);
     
     //2. 查对应vport的tt到达表，取出对应的表项
     arrive_tt_table = ovsl_dereference(p->arrive_tt_table);
@@ -293,14 +299,52 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb) {
         printk(KERN_ALERT "DEBUG: arrive_tt_table is empty %s %d \n", __FUNCTION__, __LINE__);
         return;
     }
-    tt_item = tt_table_lookup(arrive_tt_table, tthdr->flow_id);
+    tt_item = tt_table_lookup(arrive_tt_table, flow_id);
     if (tt_item)
         printk(KERN_ALERT "arrive_table: flow_id=>%d, buffer_id=>%d, length=>%d, %s %d \n", 
             tt_item->flow_id, tt_item->buffer_id, tt_item->len,__FUNCTION__, __LINE__);
     
+    // 比对时间
+    /**
+    getnstimeofday(&current_time);
+    global_time = global_time_read();
+    arrive_global_time = global_time - (TIMESPEC_TO_NSEC(current_time) - TIMESPEC_TO_NSEC(arrive_stamp));
+    offset_time =  do_div(arrive_global_time, tt_item->circle);
+    if (offset_time > tt_item->time + MAX_JITTER || offset_time < tt_item->time - MAX_JITTER) {
+        printk(KERN_ALERT "the flow arrive out of range: flow_id=>%d, %s %d \n", flow_id,__FUNCTION__, __LINE__);
+        kfree_skb(skb);
+        return;
+    }**/
+
+    // 加入到tt_buffer
+    if (unlikely(flow_id >= TT_BUFFER_SIZE)) {
+        printk(KERN_ALERT "flow_id out of range! %s %d \n", __FUNCTION__, __LINE__);
+        kfree_skb(skb);
+        return;
+    }
+
+    // 这里应该还有一步，判断当前vport是否是最后一跳，是否需要转化为标准的upd报文
+    err = tt_to_trdp(skb); //转化为trdp数据报文
+    if (err) {
+        printk(KERN_ALERT "DEBUG: tt to trdp failed! %s %d \n", __FUNCTION__, __LINE__);
+        return;
+    }
+    
+    
+    dp->tt_buffer[flow_id] = skb;
+    if (!dp->tt_buffer[flow_id]) {
+        printk(KERN_ALERT "DEBUG: can't insert into tt_bufer, dp feautres %d vport_id %u flow_id %u %s %d \n", 
+                dp->user_features, p->port_no, flow_id, __FUNCTION__, __LINE__);
+    }
+    else {
+        printk(KERN_ALERT "DEBUG: insert into tt_bufer, dp feautres %d vport_id %u flow id %u %s %d \n", 
+                dp->user_features, p->port_no, flow_id, __FUNCTION__, __LINE__);
+    }
+
+    /**
     // test, 从源端口发出TT报文和UDRP报文
     send_tt_table = ovsl_dereference(p->send_tt_table);
-    tt_item = tt_table_lookup(send_tt_table, tthdr->flow_id);
+    tt_item = tt_table_lookup(send_tt_table, flow_id);
     if (tt_item)
         printk(KERN_ALERT "send_table: flow_id=>%d, buffer_id=>%d, length=>%d, %s %d \n", 
             tt_item->flow_id, tt_item->buffer_id, tt_item->len,__FUNCTION__, __LINE__);
@@ -357,7 +401,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb) {
     //5. sleep一下
 
     //6. 从buffer中获得要发送的报文，将其进行发送
-    
+    **/
 }
 
 /* Must be called with rcu_read_lock. */
@@ -1711,6 +1755,10 @@ static int ovs_dp_cmd_new(struct sk_buff *skb, struct genl_info *info)
 
 	for (i = 0; i < DP_VPORT_HASH_BUCKETS; i++)
 		INIT_HLIST_HEAD(&dp->ports[i]);
+    
+    // tt_buffer initialize
+    dp->tt_buffer = kzalloc(TT_BUFFER_SIZE * sizeof(struct sk_buff*), GFP_KERNEL);
+    printk(KERN_ALERT "DEBUG: dp->tt_buffer init  %s %d \n", __FUNCTION__, __LINE__);
 
 	/* Set up our datapath device. */
 	parms.name = nla_data(a[OVS_DP_ATTR_NAME]);
@@ -2446,7 +2494,6 @@ static int __init dp_init(void)
 {
 	int err;
 	BUILD_BUG_ON(sizeof(struct ovs_skb_cb) > FIELD_SIZEOF(struct sk_buff, cb));
-        printk(KERN_ALERT "DEBUG: dp_init  %s %d \n", __FUNCTION__, __LINE__);
 	pr_info("Open vSwitch switching datapath %s\n", VERSION);
 
 	err = compat_init();
