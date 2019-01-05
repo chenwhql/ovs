@@ -49,6 +49,7 @@
 #include "shash.h"
 #include "simap.h"
 #include "timeval.h"
+#include "tt.h"
 
 struct match;
 struct ofputil_flow_mod;
@@ -136,6 +137,9 @@ struct ofproto {
     struct hmap groups OVS_GUARDED;   /* Contains "struct ofgroup"s. */
     uint32_t n_groups[4] OVS_GUARDED; /* # of existing groups of each type. */
     struct ofputil_group_features ogf;
+
+    /* TT flow table (extension) */
+    struct onf_tt_table *tt_table;
 };
 
 void ofproto_init_tables(struct ofproto *, int n_tables);
