@@ -9877,7 +9877,7 @@ ofputil_decode_tt_table_mod(const struct ofp_header *oh,
         ttm->flag = UNSPEC_ENTRY;
         break;
     }
-    ttm->table_size = (metadata & 0x00FFFFFF) + 100;// a mistack to test add by zhanghao
+    ttm->table_size = (metadata & 0x00FFFFFF);
 	
     ttm->port = ntohl(tx_ttm->port);
     ttm->etype = ntohl(tx_ttm->etype);
