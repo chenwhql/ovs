@@ -1334,10 +1334,17 @@ struct ofputil_tt_flow_ctrl_msg {
     uint16_t    type;
 };
 
+enum entry_type {
+    UNSPEC_ENTRY,
+    FIRST_ENTRY,
+    LAST_ENTRY,
+};
+
 struct ofputil_tt_flow_mod_msg {
     /* Entry control */
     uint16_t    table_id;
-    uint32_t    metadata;
+    uint32_t    flag;
+    uint32_t    table_size;
     
     /* Entry Field*/
     uint32_t    port;

@@ -1737,7 +1737,7 @@ dpif_tt_operate(struct dpif *dpif, struct dpif_tt_op **ops, size_t n_ops)
 
 int
 dpif_tt_flow_put(struct dpif *dpif, 
-                 ovs_be16 table_id, ovs_be32 metadata,
+                 ovs_be16 table_id, ovs_be32 flag, ovs_be32 table_size,
                  ovs_be32 port, ovs_be32 etype, ovs_be32 flow_id, 
                  ovs_be64 base_offset, ovs_be64 period, ovs_be32 buffer_id, 
                  ovs_be32 packet_size, ovs_be64 execute_time)
@@ -1747,7 +1747,8 @@ dpif_tt_flow_put(struct dpif *dpif,
     
     op.type = DPIF_OP_TT_FLOW_PUT;
     op.u.tt_flow_put.table_id = table_id;
-    op.u.tt_flow_put.metadata = metadata;
+    op.u.tt_flow_put.flag = flag;
+    op.u.tt_flow_put.table_size = table_size;
     op.u.tt_flow_put.port = port;
     op.u.tt_flow_put.etype = etype;
     op.u.tt_flow_put.flow_id = flow_id;

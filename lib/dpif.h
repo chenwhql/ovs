@@ -868,7 +868,8 @@ enum dpif_tt_op_type {
 struct dpif_tt_flow_put {
     /* Entry control */
     ovs_be16 table_id;
-    ovs_be32 metadata;
+	ovs_be32 flag;
+	ovs_be32 table_size;
     
     /* Entry field */
     ovs_be32 port; /* The entry related port. */
@@ -907,7 +908,7 @@ struct dpif_tt_flow {
 };
 
 int dpif_tt_flow_put(struct dpif *dpif, 
-                     ovs_be16 table_id, ovs_be32 metadata,
+                     ovs_be16 table_id, ovs_be32 flag, ovs_be32 tabel_size,
                      ovs_be32 port, ovs_be32 etype, ovs_be32 flow_id, 
                      ovs_be64 base_offset, ovs_be64 period, 
                      ovs_be32 buffer_id, ovs_be32 packet_size, ovs_be64 execute_time);

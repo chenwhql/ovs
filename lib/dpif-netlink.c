@@ -45,6 +45,7 @@
 #include "netlink-socket.h"
 #include "netlink.h"
 #include "odp-util.h"
+#include "ofp-util.h"
 #include "ofpbuf.h"
 #include "packets.h"
 #include "poll-loop.h"
@@ -2346,11 +2347,6 @@ dpif_netlink_ct_flush(struct dpif *dpif OVS_UNUSED, const uint16_t *zone)
 /* tt extension*/
 /* Appends to 'buf' (which must initially be empty) a "struct ovs_header"
  * followed by Netlink attributes corresponding to 'flow'. */
-enum entry_type {
-    UNSPEC_ENTRY,
-    FIRST_ENTRY,
-    LAST_ENTRY,
-};
 
 struct dpif_netlink_tt_flow {
     /* Generic Netlink header.*/
@@ -2362,7 +2358,7 @@ struct dpif_netlink_tt_flow {
     
     /* Attributes. */
     ovs_be16 table_id;       /* OVS_TT_FLOW_ATTR_TABLE_ID */
-    enum entry_type flag;    /* OVS_TT_FLOW_ATTR_FALG */
+    ovs_be32 flag;    /* OVS_TT_FLOW_ATTR_FALG */
     ovs_be32 table_size;     /* OVS_TT_FLOW_ATTR_TABLE_SIZE */
     
     ovs_be32 port;           /* OVS_TT_FLOW_ATTR_PORT. */
@@ -2419,22 +2415,8 @@ dpif_netlink_init_tt_flow_put(struct dpif_netlink *dpif,
 {
     dpif_netlink_tt_flow_init(request);
     request->cmd = OVS_TT_FLOW_CMD_ADD;
-    
-    request->flag = (put->metadata >> 24) & 0x000000FF;
-    switch (request->flag) {
-    case 1: 
-        request->flag = FIRST_ENTRY;
-        request->table_size = 0;
-        break;
-    case 2:
-        request->flag = LAST_ENTRY;
-        request->table_size = put->metadata & 0x00FFFFFF;
-        break;
-    case 0:
-        request->flag = UNSPEC_ENTRY;
-        request->table_size = 0;
-        break;
-    }
+    request->flag = put->flag;
+    request->table_size = put->table_size;
     request->table_id = put->table_id;
     request->port = put->port;
     request->etype = put->etype;
@@ -2446,6 +2428,51 @@ dpif_netlink_init_tt_flow_put(struct dpif_netlink *dpif,
     request->execute_time = put->execute_time;
     request->dp_ifindex = dpif->dp_ifindex;
     //dpif_netlink_flow_init_ufid(request, put->ufid, false);
+}
+
+static int 
+dpif_netlink_tt_flow_from_ofpbuf(uint32_t *table_item_received,
+										   const struct ofpbuf *buf)
+{
+	static const struct nl_policy ovs_tt_policy[__OVS_TT_FLOW_ATTR_MAX] = {
+		[OVS_TT_FLOW_ATTR_TABLE_ID] = { .type = NL_A_U16, .optional = true },
+		[OVS_TT_FLOW_ATTR_FLAG] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_TABLE_SIZE] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_PORT] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_ETYPE] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_FLOW_ID] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_BASE_OFFSET] = { .type = NL_A_U64, .optional = true },
+		[OVS_TT_FLOW_ATTR_PERIOD] = { .type = NL_A_U64, .optional = true },
+		[OVS_TT_FLOW_ATTR_BUFFER_ID] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_PACKET_SIZE] = { .type = NL_A_U32, .optional = true },
+		[OVS_TT_FLOW_ATTR_EXECUTE_TIME] = { .type = NL_A_U64, .optional = true },
+	};
+	
+	struct nlattr *a[ARRAY_SIZE(ovs_tt_policy)];
+	struct ovs_header *ovs_header;
+	struct nlmsghdr *nlmsg;
+	struct genlmsghdr *genl;
+	struct ofpbuf b;
+	
+	ofpbuf_use_const(&b, buf->data, buf->size);
+	nlmsg = ofpbuf_try_pull(&b, sizeof *nlmsg);
+	genl = ofpbuf_try_pull(&b, sizeof *genl);
+	ovs_header = ofpbuf_try_pull(&b, sizeof *ovs_header);
+	
+    if (!nlmsg || !genl || !ovs_header
+            || nlmsg->nlmsg_type != ovs_tt_family
+            || !nl_policy_parse(&b, 0, ovs_tt_policy, a,
+                                ARRAY_SIZE(ovs_tt_policy))) {
+        return EINVAL;
+    }
+	
+	*table_item_received  = 0;
+	if (a[OVS_TT_FLOW_ATTR_TABLE_SIZE]) {
+		*table_item_received = *(uint32_t *)nl_attr_get(a[OVS_TT_FLOW_ATTR_TABLE_SIZE]);
+	} else {
+		VLOG_WARN("the datapath didn't give me OVS_TT_FLOW_ATTR_TABLE_SIZE!");
+	}
+	return 0;
 }
 
 /* Executes, against 'dpif', up to the first 'n_ops' operations in 'ops'.
@@ -2496,6 +2523,7 @@ dpif_netlink_tt_operate__(struct dpif_netlink *dpif,
                 flow.nlmsg_flags |= NLM_F_ECHO;
                 aux->txn.reply = &aux->reply;
             }*/
+			aux->txn.reply = &aux->reply;
             dpif_netlink_tt_flow_to_ofpbuf(&flow, &aux->request);
 			
             /*
@@ -2550,7 +2578,7 @@ dpif_netlink_tt_operate__(struct dpif_netlink *dpif,
         struct op_auxdata *aux = &auxes[i];
         struct nl_transaction *txn = &auxes[i].txn;
         struct dpif_tt_op *op = ops[i];
-        //struct dpif_tt_flow_put *put;
+        struct dpif_tt_flow_put *put;
         //struct dpif_tt_flow_del *del;
         //struct dpif_tt_flow_get *get;
 
@@ -2558,20 +2586,17 @@ dpif_netlink_tt_operate__(struct dpif_netlink *dpif,
 
         switch (op->type) {
         case DPIF_OP_TT_FLOW_PUT:
-            /*
-            put = &op->u.flow_put;
-            if (put->stats) {
-                if (!op->error) {
-                    struct dpif_netlink_flow reply;
-
-                    op->error = dpif_netlink_tt_flow_from_ofpbuf(&reply,
-                                                              txn->reply);
-                    if (!op->error) {
-                        dpif_netlink_flow_get_stats(&reply, put->stats);
-                    }
-                }
-            }
-            */
+            put = &op->u.tt_flow_put;
+            if (put->flag == LAST_ENTRY) {
+                uint32_t table_item_received = 0;
+                dpif_netlink_tt_flow_from_ofpbuf(&table_item_received, txn->reply);
+                if (table_item_received == put->table_size) {
+                    VLOG_WARN("The datapath said that it recevived all the table item.");
+                } else {
+                    VLOG_WARN("The datapath said that it recevived the table item: %u, but I have sent %u!", 
+                              table_item_received, put->table_size);
+				}
+			}
             break;
 
         case DPIF_OP_TT_FLOW_DEL:

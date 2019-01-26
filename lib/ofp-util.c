@@ -9851,7 +9851,9 @@ ofputil_decode_tt_table_mod(const struct ofp_header *oh,
 {
     struct onf_tt_flow_mod *tx_ttm;
     struct ofpbuf msg;
-    
+    uint32_t metadata;
+    enum entry_type flag;
+	
     /* get the struct tx_tt_table_mod in the openflow message 
      * sended from the SDN controller.
      */
@@ -9861,7 +9863,22 @@ ofputil_decode_tt_table_mod(const struct ofp_header *oh,
     tx_ttm = ofpbuf_pull(&msg, sizeof *tx_ttm);
     /* tx_tt_table_mod --> ofputil_tt_table_mod */
     ttm->table_id = ntohs(tx_ttm->table_id);
-    ttm->metadata = ntohl(tx_ttm->metadata);
+	
+    metadata = ntohl(tx_ttm->metadata);
+	flag = (metadata >> 24) & 0x000000FF;
+	switch (flag) {
+    case 1: 
+        ttm->flag = FIRST_ENTRY;
+        break;
+    case 2:
+        ttm->flag = LAST_ENTRY;
+        break;
+    case 0:
+        ttm->flag = UNSPEC_ENTRY;
+        break;
+    }
+    ttm->table_size = (metadata & 0x00FFFFFF) + 100;// a mistack to test add by zhanghao
+	
     ttm->port = ntohl(tx_ttm->port);
     ttm->etype = ntohl(tx_ttm->etype);
     ttm->flow_id = ntohl(tx_ttm->flow_id);

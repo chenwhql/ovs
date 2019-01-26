@@ -5759,7 +5759,7 @@ tt_flow_add(const struct ofproto *ofproto_, const struct ofputil_tt_flow_mod_msg
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(ofproto_);
     odp_port_t port = ofp_port_to_odp_port(ofproto, mod->port);
     dpif_tt_flow_put(ofproto->backer->dpif, 
-                     mod->table_id, mod->metadata,
+                     mod->table_id, mod->flag, mod->table_size,
                      port, mod->etype, mod->flow_id, mod->base_offset,
                      mod->period, mod->buffer_id, mod->packet_size, mod->execute_time);
     return 0;
