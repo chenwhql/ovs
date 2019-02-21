@@ -326,6 +326,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 	u64 global_time;
 	u64 arrive_global_time;
 	u64 offset_time;
+	u64 time_diff;
 	u16 flow_id;
 
 	/* extract skb timestamp and flow id */
@@ -355,8 +356,10 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 			- TIMESPEC_TO_NSEC(arrive_stamp));
 	
 	offset_time =  arrive_global_time % tt_item->period;
-	if (offset_time > tt_item->base_offset + MAX_JITTER) {
-		pr_info("LATE_PACKET: flow_id %u arrive late on vport %d!, throw it!", flow_id, p->port_no);
+	time_diff = offset_time - (tt_item->base_offset + MAX_JITTER);
+	if (time_diff > 0) {
+		pr_info("LATE_PACKET: flow_id %u arrive late on vport %d!, 
+                over %llu ns, throw it!", flow_id, p->port_no, time_diff);
 		kfree_skb(skb);
 		return;
 	}
@@ -367,7 +370,8 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 		return;
 	}
 
-	/* ===>> convert to trdp packet, just for test. */
+	/* convert to trdp packet. 
+	 *o convert packet in every inport or outport. */
 	err = tt_to_trdp(skb);
 	if (err) 
 		return;

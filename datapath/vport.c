@@ -41,6 +41,7 @@
 #include "gso.h"
 #include "vport.h"
 #include "vport-internal_dev.h"
+#include "tt.h"
 
 static LIST_HEAD(vport_ops_list);
 
@@ -943,7 +944,7 @@ int ovs_vport_start_tt_schedule(struct vport* vport)
 		pr_info("ERROR: dispatch send info fail!");
 		return -EINVAL;
 	}
-	vport->tt_schedule_info->send_info->advance_time = 2000000; //===>just for test
+	vport->tt_schedule_info->send_info->advance_time = SEND_ADVANCE_TIME; //===>just for test
 	ovs_vport_hrtimer_start(vport);
 	return 0;
 }
