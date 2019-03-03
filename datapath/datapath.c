@@ -358,8 +358,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 	offset_time =  arrive_global_time % tt_item->period;
 	time_diff = offset_time - (tt_item->base_offset + MAX_JITTER);
 	if (time_diff > 0) {
-		pr_info("LATE_PACKET: flow_id %u arrive late on vport %d!, 
-                over %llu ns, throw it!", flow_id, p->port_no, time_diff);
+		pr_info("LATE_PACKET: flow_id %u arrive late on vport %d!, over %llu ns, throw it!\n", flow_id, p->port_no, time_diff);
 		kfree_skb(skb);
 		return;
 	}

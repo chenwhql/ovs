@@ -113,7 +113,7 @@ static int push_tt(struct sk_buff *skb, const __be16* flow_id)
 
 	/* push tt message header */
 	tt_hdr = (struct tt_header*)skb_tt_header(skb);
-	tt_hdr->flow_id = *flow_id;
+	tt_hdr->flow_id = ntohs(*flow_id);
 	tt_hdr->len = skb->len - 4; //===>>> uncertain??
 	return 0;
 }
@@ -146,8 +146,9 @@ static int pop_tt(struct sk_buff *skb)
 */
 int trdp_to_tt(struct sk_buff *skb) 
 {
-	/* in trdp packet, the first two bytes of the udp data field are flow_id */
-	void* udp_data = skb_transport_header(skb) + sizeof(struct udphdr);
+	/* in trdp packet, the first two bytes of the udp data field are flow_id
+	 * 16 is the length of pktgen header */
+	void* udp_data = skb_transport_header(skb) + sizeof(struct udphdr) + 16;
 	__be16* flow_id = (__be16*)udp_data;
 
 	return push_tt(skb, flow_id);
