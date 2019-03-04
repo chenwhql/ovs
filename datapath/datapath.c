@@ -326,8 +326,8 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 	u64 global_time;
 	u64 arrive_global_time;
 	u64 offset_time;
-	u64 time_diff;
 	u16 flow_id;
+	int64_t time_diff;
 
 	/* extract skb timestamp and flow id */
 	skb_get_timestampns(skb, &arrive_stamp);
