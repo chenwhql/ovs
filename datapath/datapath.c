@@ -361,6 +361,8 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 		pr_info("LATE_PACKET: flow_id %u arrive late on vport %d!, over %llu ns, throw it!\n", flow_id, p->port_no, time_diff);
 		kfree_skb(skb);
 		return;
+	} else {
+		pr_info("RECV_PACKET: flow_id %u arrive on vport %d!, over base %llu ns\n", flow_id, p->port_no, offset_time - tt_item->base_offset);
 	}
 
 	/* add to tt buffer. */
