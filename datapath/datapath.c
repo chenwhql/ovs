@@ -338,7 +338,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 		return;
 	}
 	flow_id = tthdr->flow_id;
-	pr_info("PROCESS: vport_no %d arrive flow id %d.\n", p->port_no, flow_id);
+	//pr_info("PROCESS: vport_no %d arrive flow id %d.\n", p->port_no, flow_id);
 	
 	/* loop up tt arrive table. */
 	tt_item = ovs_vport_lookup_arrive_tt_table(p, flow_id);
@@ -362,7 +362,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 		kfree_skb(skb);
 		return;
 	} else {
-		pr_info("RECV_PACKET: flow_id %u arrive on vport %d!, over base %lld ns\n", flow_id, p->port_no, offset_time - tt_item->base_offset);
+		//pr_info("RECV_PACKET: flow_id %u arrive on vport %d!, over base %lld ns\n", flow_id, p->port_no, offset_time - tt_item->base_offset);
 	}
 
 	/* add to tt buffer. */

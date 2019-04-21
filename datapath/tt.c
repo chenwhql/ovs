@@ -609,10 +609,11 @@ int dispatch(struct vport* vport)
 	sort(send_times, flow_ids, 0, size - 1);
 	
 	/* print info */
-	pr_info("DISPATCH: macro_period: %llu, size: %llu\n", macro_period, size);
-	for (i = 0; i < size;i++){
+	/*
+    pr_info("DISPATCH: macro_period: %llu, size: %llu\n", macro_period, size);
+	for (i = 0; i < size; i++){
 		pr_info("DISPATCH: index %d, flow_id: %d, send_time: %llu", i, flow_ids[i], send_times[i]);
-	}
+	}*/
 
 	send_cache = &send_info->send_cache;
 	if (send_cache->send_times)
@@ -700,8 +701,10 @@ void get_next_time(struct tt_schedule_info *schedule_info, u64 cur_time, u64 *wa
 	}
 
 	//*send_time = cur_time + *send_time;
-	pr_info("SEND_INFO: mod_time %llu, cur_idx %d, current flow id %d, current send time %llu", \
-			mod_time, idx, send_cache->flow_ids[idx], send_cache->send_times[idx]);
+	/*
+    pr_info("SEND_INFO: mod_time %llu, cur_idx %d, current flow id %d, current send time %llu", \
+	    	mod_time, idx, send_cache->flow_ids[idx], send_cache->send_times[idx]);
+    */
 }
 
 void tt_send_info_free(struct tt_send_info *send_info)
