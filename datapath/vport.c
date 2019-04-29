@@ -304,6 +304,7 @@ static enum hrtimer_restart hrtimer_handler(struct hrtimer *timer)
 
 	if (vport->dp->tt_buffer) {
 		skb = vport->dp->tt_buffer[flow_id];
+		pr_info("BUFFER: vport %d, dp_addr: %p\n", vport->port_no, &(vport->dp));
 		vport->dp->tt_buffer[flow_id] = NULL;
 	}
 
@@ -318,7 +319,7 @@ static enum hrtimer_restart hrtimer_handler(struct hrtimer *timer)
 		}
 	
 		if (skb) {
-			//pr_info("FINISH: vport id %d send flow id %d \n", vport->port_no, flow_id);
+			pr_info("FINISH: vport id %d send flow id %d \n", vport->port_no, flow_id);
 			skb_get_timestampns(skb, &arrive_stamp);
 			if (TIMESPEC_TO_NSEC(current_time) - TIMESPEC_TO_NSEC(arrive_stamp) <= 
 				send_info->macro_period) {

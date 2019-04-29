@@ -338,7 +338,7 @@ static void ovs_dp_process_tt_packet(struct sk_buff *skb)
 		return;
 	}
 	flow_id = tthdr->flow_id;
-	//pr_info("PROCESS: vport_no %d arrive flow id %d.\n", p->port_no, flow_id);
+	pr_info("PROCESS: vport_no %d arrive flow id %d.\n", p->port_no, flow_id);
 	
 	/* loop up tt arrive table. */
 	tt_item = ovs_vport_lookup_arrive_tt_table(p, flow_id);
